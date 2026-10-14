@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>辯論隨機抽題與倒數計時工具 (單機版)</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & Noto Sans TC -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Noto Sans TC"', 'Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      --sync-font-size: 22px;
+      --sync-line-height: 1.5;
+    }
+
+    .sync-font-target {
+      font-size: var(--sync-font-size) !important;
+      line-height: var(--sync-line-height) !important;
+    }
+
+    textarea.auto-expand {
+      resize: none !important;
+      overflow: hidden !important;
+      min-height: 80px;
+    }
+
+    @keyframes pulse-fast {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.02); }
+    }
+
+    .animate-pulse-fast {
+      animation: pulse-fast 0.6s infinite;
+    }
+
+    .glow-pro {
+      box-shadow: 0 0 35px rgba(16, 185, 129, 0.25);
+    }
+    .glow-con {
+      box-shadow: 0 0 35px rgba(239, 68, 68, 0.25);
+    }
+  </style>
+</head>
+<body class="min-h-full bg-slate-950 text-slate-100 flex flex-col font-sans antialiased selection:bg-blue-500 selection:text-white relative">
+
+  <!-- Toast Notification Popup -->
+  <div id="toast" class="fixed top-5 right-5 z-50 transform transition-all duration-300 opacity-0 translate-y-[-20px] pointer-events-none bg-indigo-600 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center space-x-2 font-medium border border-indigo-400/30">
+    <svg class="w-5 h-5 flex-shrink-0 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+    <span id="toastMsg">提示訊息</span>
+  </div>
+
+  <!-- Custom Modal for Confirmation (Replaces native confirm()) -->
+  <div id="confirmModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-200">
+    <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-md w-full shadow-2xl transform scale-95 transition-transform duration-200">
+      <div class="flex items-center space-x-3 mb-4 text-amber-400">
+        <div class="p-3 bg-amber-500/20 rounded-2xl border border-amber-500/30">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+        </div>
+        <h3 id="modalTitle" class="text-lg font-bold text-white">確認操作</h3>
+      </div>
+      <p id="modalMessage" class="text-slate-300 text-sm leading-relaxed mb-6">您確定要執行此操作嗎？</p>
+      <div class="flex items-center justify-end space-x-3">
+        <button id="modalCancelBtn" type="button" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition border border-slate-700">取消</button>
+        <button id="modalConfirmBtn" type="button" class="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition shadow-lg shadow-purple-600/30">確認重置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header Section -->
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md sticky top-0 z-40 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-2xl shadow-lg shadow-blue-500/20">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-xl font-black tracking-tight text-white flex items-center gap-2">
+            辯論隨機抽題與倒數計時工具
+            <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-700 text-slate-300 border border-slate-600">純單機版</span>
+          </h1>
+          <p class="text-xs text-slate-400">不重複抽號 / 題目論點同步放大 / 本地離線保密運作</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-3">
+        <button type="button" onclick="exportStateJSON()" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/25 text-xs font-black transition flex items-center space-x-1.5 cursor-pointer" title="將目前的題目、號碼紀錄與設定匯出為 JSON 備份檔">
+          <span>📥</span>
+          <span>匯出 JSON 檔</span>
+        </button>
+
+        <button type="button" onclick="triggerImportState()" class="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-600/25 text-xs font-black transition flex items-center space-x-1.5 cursor-pointer" title="選擇並載入先前備份的 JSON 檔案">
+          <span>📤</span>
+          <span>匯入 JSON 檔</span>
+        </button>
+        <input type="file" id="importFileInput" accept=".json" class="hidden" onchange="handleImportFile(event)">
+
+        <button id="soundToggleBtn" onclick="toggleSound()" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-bold transition flex items-center space-x-1.5">
+          <span id="soundIcon">🔔</span>
+          <span id="soundText">提示音：開啟</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1 w-full">
+
+    <!-- Global Settings Control Panel -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+        
+        <!-- Synchronized Font Size Control -->
+        <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between">
+          <div class="flex justify-between items-center mb-2">
+            <label for="fontSizeSlider" class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 5v14m0 0H7m2 0h2M14 11h7m-3.5 0v8m0 0h-1.5m1.5 0h1.5"></path></svg>
+              字體大小同步 (題目與論點)
+            </label>
+            <span id="fontSizeDisplay" class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">22 px</span>
+          </div>
+          <div class="flex items-center space-x-3">
+            <span class="text-xs text-slate-500 font-bold">16px</span>
+            <input type="range" id="fontSizeSlider" min="16" max="48" value="22" step="1" 
+                   class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500 transition">
+            <span class="text-xs text-slate-500 font-bold">48px</span>
+          </div>
+        </div>
+
+        <!-- Timer Presets & Custom Input -->
+        <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5">
+          <label class="block text-xs font-bold text-slate-300 mb-2 flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            倒數計時時間設定
+          </label>
+          <div class="flex items-center space-x-2">
+            <button type="button" onclick="setPresetTimer(60)" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">1 分鐘</button>
+            <button type="button" onclick="setPresetTimer(90)" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">90 秒</button>
+            <div class="relative flex-1">
+              <input type="number" id="customTimerInput" min="5" max="3600" placeholder="自訂(秒)" value="60"
+                     class="w-full bg-slate-900 border border-slate-700 text-slate-100 text-xs rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:outline-none pr-8">
+              <span class="absolute right-2 top-1.5 text-[10px] text-slate-500 font-semibold">秒</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Number Draw Range & Drawn Tracker -->
+        <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5">
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+              抽選號碼範圍
+            </label>
+            <span id="remainingCountBadge" class="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+              剩餘: 30 / 30
+            </span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <input type="number" id="minNum" value="1" min="1" onchange="handleRangeChange()" class="w-full bg-slate-900 border border-slate-700 text-slate-100 text-xs rounded-lg px-2.5 py-1.5 text-center focus:ring-2 focus:ring-purple-500 focus:outline-none">
+            <span class="text-xs text-slate-400 font-bold">至</span>
+            <input type="number" id="maxNum" value="30" min="1" onchange="handleRangeChange()" class="w-full bg-slate-900 border border-slate-700 text-slate-100 text-xs rounded-lg px-2.5 py-1.5 text-center focus:ring-2 focus:ring-purple-500 focus:outline-none">
+            <button type="button" onclick="confirmResetHistory()" title="重置已抽過的號碼" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 transition whitespace-nowrap">
+              🔄 重置號碼
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Drawn Numbers History Badge Area -->
+      <div class="mt-4 pt-3 border-t border-slate-800/80 flex flex-wrap items-center gap-2">
+        <span class="text-xs font-bold text-slate-400 flex items-center gap-1">
+          <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+          已抽過的號碼紀錄：
+        </span>
+        <div id="drawnHistoryBadges" class="flex flex-wrap items-center gap-1.5 flex-1 min-h-[28px]">
+          <span class="text-xs text-slate-600 italic">尚無抽號紀錄</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Topics & Arguments Form Section -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      
+      <!-- LEFT TOPIC CARD -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div class="flex items-center space-x-2">
+            <span class="px-2.5 py-1 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30 text-xs font-black">【左題】</span>
+            <span class="text-sm font-bold text-slate-300">題目 A 區塊</span>
+          </div>
+          <button type="button" onclick="clearTopic('left')" class="text-xs text-slate-500 hover:text-slate-300 transition">清空資料</button>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">題目名稱：</label>
+          <input type="text" id="leftTopicTitle" 
+                 class="sync-font-target w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-bold focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:outline-none transition" 
+                 value="高中全面實施雙語教學利大於弊">
+        </div>
+
+        <!-- Left Pro (Up) -->
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-emerald-400 flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            上：正方論點 (Pro)
+          </label>
+          <textarea id="leftProText" 
+                    class="auto-expand sync-font-target w-full bg-slate-950/80 border border-emerald-900/60 focus:border-emerald-500 rounded-xl p-3 text-emerald-100 focus:ring-2 focus:ring-emerald-500/30 focus:outline-none transition"
+                    placeholder="請填入左題正方論點...">提早與國際接軌，培養語言競爭力，能有效增加學生未來進入國際職場與學術研究的優勢。</textarea>
+        </div>
+
+        <!-- Left Con (Down) -->
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-rose-400 flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+            下：反方論點 (Con)
+          </label>
+          <textarea id="leftConText" 
+                    class="auto-expand sync-font-target w-full bg-slate-950/80 border border-rose-900/60 focus:border-rose-500 rounded-xl p-3 text-rose-100 focus:ring-2 focus:ring-rose-500/30 focus:outline-none transition"
+                    placeholder="請填入左題反方論點...">恐造成城鄉教育資源差距進一步擴大；且專業學科若因語言障礙影響吸收，將降低整體教學品質與學習動機。</textarea>
+        </div>
+      </div>
+
+      <!-- RIGHT TOPIC CARD -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div class="flex items-center space-x-2">
+            <span class="px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-xs font-black">【右題】</span>
+            <span class="text-sm font-bold text-slate-300">題目 B 區塊</span>
+          </div>
+          <button type="button" onclick="clearTopic('right')" class="text-xs text-slate-500 hover:text-slate-300 transition">清空資料</button>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">題目名稱：</label>
+          <input type="text" id="rightTopicTitle" 
+                 class="sync-font-target w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-bold focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:outline-none transition" 
+                 value="政府應全面開徵碳稅以因應氣候變遷">
+        </div>
+
+        <!-- Right Pro (Up) -->
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-emerald-400 flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            上：正方論點 (Pro)
+          </label>
+          <textarea id="rightProText" 
+                    class="auto-expand sync-font-target w-full bg-slate-950/80 border border-emerald-900/60 focus:border-emerald-500 rounded-xl p-3 text-emerald-100 focus:ring-2 focus:ring-emerald-500/30 focus:outline-none transition"
+                    placeholder="請填入右題正方論點...">提供強烈經濟誘因迫使企業加速高碳排轉型，並為綠色能源發展提供穩定且長期之財源。</textarea>
+        </div>
+
+        <!-- Right Con (Down) -->
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-rose-400 flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+            下：反方論點 (Con)
+          </label>
+          <textarea id="rightConText" 
+                    class="auto-expand sync-font-target w-full bg-slate-950/80 border border-rose-900/60 focus:border-rose-500 rounded-xl p-3 text-rose-100 focus:ring-2 focus:ring-rose-500/30 focus:outline-none transition"
+                    placeholder="請填入右題反方論點...">短期內將顯著推升物價與民生用電成本，綠色通貨膨脹將對中低收入戶與中小企業造成巨大經濟負擔。</textarea>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Action Panel Button -->
+    <section class="flex flex-col items-center justify-center py-2">
+      <button type="button" id="drawBtn" onclick="drawAndStart()" 
+              class="group relative inline-flex items-center justify-center px-10 py-5 text-xl font-black text-white transition-all duration-300 ease-out bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl shadow-2xl hover:shadow-blue-500/30 hover:scale-105 active:scale-95 border border-white/20">
+        <span class="mr-3 text-2xl group-hover:rotate-180 transition-transform duration-500">🎲</span>
+        <span>隨機抽選論點並開始計時</span>
+      </button>
+      <p class="text-xs text-slate-500 mt-2">自動挑選未抽過的號碼、本地資料完全保密</p>
+    </section>
+
+    <!-- Result and Clock Display Section -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      
+      <!-- Result Card -->
+      <div id="resultContainer" class="lg:col-span-7 bg-slate-900 border-2 border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col justify-between transition-all duration-300">
+        <div>
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-blue-500 animate-ping"></span>
+              抽選結果提問面板
+            </span>
+            <span id="resBadgeNumber" class="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono font-black text-sm">
+              尚未抽選
+            </span>
+          </div>
+
+          <!-- Result Header Badges -->
+          <div id="resTopicBadgeContainer" class="mb-3 flex flex-wrap items-center gap-2">
+            <span id="resSideTag" class="px-3 py-1 rounded-lg bg-slate-800 text-slate-400 font-bold text-xs">---</span>
+            <span id="resStanceBadge" class="px-3 py-1 rounded-lg bg-slate-800 text-slate-400 font-bold text-xs">---</span>
+          </div>
+
+          <!-- Dynamic Topic Title -->
+          <div class="mb-4">
+            <p class="text-xs font-semibold text-slate-500 mb-1">抽中題目：</p>
+            <h3 id="resTopicTitle" class="sync-font-target font-black text-slate-100 tracking-tight leading-snug break-words">
+              等待抽選...請點擊上方「隨機抽選」按鈕
+            </h3>
+          </div>
+
+          <!-- Dynamic Full Argument Content -->
+          <div class="bg-slate-950/90 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-center">
+            <p class="text-xs font-semibold text-slate-500 mb-2">抽中論點方向 (完整呈現，無捲軸)：</p>
+            <div id="resArgumentContent" class="sync-font-target text-slate-200 font-medium whitespace-pre-wrap break-words leading-relaxed">
+              點擊抽選按鈕後，此處將同步呈現對應的正方或反方論點詳細內容。
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-5 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-500">
+          <span>完整呈現模式：無需上下滾動</span>
+          <button type="button" onclick="copyResultText()" class="text-blue-400 hover:underline flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+            複製抽籤結果
+          </button>
+        </div>
+      </div>
+
+      <!-- Countdown Timer Dashboard -->
+      <div id="timerCard" class="lg:col-span-5 bg-slate-900 border-2 border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col justify-between items-center text-center relative overflow-hidden">
+        
+        <div class="w-full flex items-center justify-between border-b border-slate-800 pb-3 mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            發言倒數計時器
+          </span>
+          <span id="timerStatusTag" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400">
+            就緒
+          </span>
+        </div>
+
+        <!-- Clock Digital Display -->
+        <div class="my-4 py-2 w-full flex flex-col items-center justify-center">
+          <div id="timerDisplay" class="font-mono text-7xl sm:text-8xl font-black text-slate-100 tracking-tighter drop-shadow-md select-none transition-colors">
+            01:00
+          </div>
+          <!-- Progress bar -->
+          <div class="w-full bg-slate-950 h-2.5 rounded-full mt-4 overflow-hidden border border-slate-800">
+            <div id="timerProgressBar" class="bg-blue-500 h-full w-full transition-all duration-300"></div>
+          </div>
+        </div>
+
+        <!-- Timer Controls -->
+        <div class="w-full grid grid-cols-3 gap-2 pt-2">
+          <button type="button" id="pauseBtn" onclick="toggleTimer()" 
+                  class="w-full py-3 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-100 font-bold text-sm transition border border-slate-700 flex items-center justify-center space-x-1">
+            <span id="pauseIcon">⏸️</span>
+            <span id="pauseText">暫停</span>
+          </button>
+          
+          <button type="button" onclick="resetTimer()" 
+                  class="w-full py-3 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-100 font-bold text-sm transition border border-slate-700 flex items-center justify-center space-x-1">
+            <span>🔄</span>
+            <span>重置</span>
+          </button>
+
+          <button type="button" onclick="addTime(30)" 
+                  class="w-full py-3 px-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 font-bold text-sm transition border border-blue-500/30 flex items-center justify-center space-x-1">
+            <span>+30秒</span>
+          </button>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer class="border-t border-slate-800/80 bg-slate-950 py-4 text-center text-xs text-slate-500">
+    辯論隨機抽題與倒數計時工具 &copy; 2026 - 純單機離線版
+  </footer>
+
+  <!-- Core Logic Script -->
+  <script>
+    /* =========================================================================
+       1. Audio Notification Engine (Web Audio API)
+       ========================================================================= */
+    let audioCtx = null;
+    let isSoundEnabled = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) audioCtx = new AudioContext();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function toggleSound() {
+      isSoundEnabled = !isSoundEnabled;
+      document.getElementById('soundIcon').textContent = isSoundEnabled ? '🔔' : '🔕';
+      document.getElementById('soundText').textContent = isSoundEnabled ? '提示音：開啟' : '提示音：靜音';
+      showToast(isSoundEnabled ? '提示音已開啟' : '提示音已靜音');
+    }
+
+    function playBeepSound(type = 'alarm') {
+      if (!isSoundEnabled) return;
+      try {
+        initAudio();
+        if (!audioCtx) return;
+
+        if (type === 'start') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15);
+          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.2);
+        } else if (type === 'draw') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(1046.50, audioCtx.currentTime + 0.12);
+          gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.15);
+        } else if (type === 'alarm') {
+          [0, 0.2, 0.4].forEach((t) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime + t);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime + t);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + t + 0.15);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime + t);
+            osc.stop(audioCtx.currentTime + t + 0.15);
+          });
+        }
+      } catch (e) {
+        console.warn('Audio play error', e);
+      }
+    }
+
+    /* =========================================================================
+       2. Custom Modal Management (Replaces confirm())
+       ========================================================================= */
+    function showConfirmModal(title, message, onConfirm) {
+      const modal = document.getElementById('confirmModal');
+      const titleEl = document.getElementById('modalTitle');
+      const msgEl = document.getElementById('modalMessage');
+      const cancelBtn = document.getElementById('modalCancelBtn');
+      const confirmBtn = document.getElementById('modalConfirmBtn');
+
+      titleEl.textContent = title;
+      msgEl.textContent = message;
+
+      modal.classList.remove('opacity-0', 'pointer-events-none');
+      modal.classList.add('opacity-100');
+      modal.firstElementChild.classList.remove('scale-95');
+      modal.firstElementChild.classList.add('scale-100');
+
+      const closeModal = () => {
+        modal.classList.remove('opacity-100');
+        modal.classList.add('opacity-0', 'pointer-events-none');
+        modal.firstElementChild.classList.remove('scale-100');
+        modal.firstElementChild.classList.add('scale-95');
+        cancelBtn.onclick = null;
+        confirmBtn.onclick = null;
+      };
+
+      cancelBtn.onclick = closeModal;
+      confirmBtn.onclick = () => {
+        closeModal();
+        if (onConfirm) onConfirm();
+      };
+    }
+
+    /* =========================================================================
+       3. Drawn Numbers History Engine
+       ========================================================================= */
+    let drawnNumbersSet = new Set();
+
+    function updateDrawnHistoryUI(shouldSync = true) {
+      const minNum = parseInt(document.getElementById('minNum').value) || 1;
+      const maxNum = parseInt(document.getElementById('maxNum').value) || 1;
+      const totalRange = Math.max(0, maxNum - minNum + 1);
+
+      drawnNumbersSet.forEach(num => {
+        if (num < minNum || num > maxNum) {
+          drawnNumbersSet.delete(num);
+        }
+      });
+
+      const drawnArray = Array.from(drawnNumbersSet).sort((a, b) => a - b);
+      const remainingCount = Math.max(0, totalRange - drawnArray.length);
+
+      document.getElementById('remainingCountBadge').textContent = `剩餘: ${remainingCount} / ${totalRange}`;
+      
+      const badgeContainer = document.getElementById('drawnHistoryBadges');
+      badgeContainer.innerHTML = '';
+
+      if (drawnArray.length === 0) {
+        badgeContainer.innerHTML = '<span class="text-xs text-slate-600 italic">尚無抽號紀錄</span>';
+      } else {
+        drawnArray.forEach(num => {
+          const badge = document.createElement('span');
+          badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono text-xs font-bold';
+          badge.innerHTML = `
+            <span>#${num}</span>
+            <button type="button" onclick="removeSingleDrawnNum(${num})" class="hover:text-rose-400 transition" title="移除此號碼">&times;</button>
+          `;
+          badgeContainer.appendChild(badge);
+        });
+      }
+    }
+
+    function removeSingleDrawnNum(num) {
+      drawnNumbersSet.delete(num);
+      updateDrawnHistoryUI();
+      showToast(`已移除號碼 #${num}`);
+    }
+
+    function resetDrawnHistory() {
+      drawnNumbersSet.clear();
+      updateDrawnHistoryUI();
+      showToast('已重置所有已抽號碼紀錄');
+    }
+
+    function confirmResetHistory() {
+      showConfirmModal(
+        '重置抽號紀錄',
+        '您確定要清空當前所有已抽過的號碼歷史嗎？',
+        () => resetDrawnHistory()
+      );
+    }
+
+    function handleRangeChange() {
+      const minEl = document.getElementById('minNum');
+      const maxEl = document.getElementById('maxNum');
+      let min = parseInt(minEl.value) || 1;
+      let max = parseInt(maxEl.value) || 1;
+
+      if (min < 1) min = 1;
+      if (max < min) max = min;
+
+      minEl.value = min;
+      maxEl.value = max;
+
+      updateDrawnHistoryUI();
+    }
+
+    /* =========================================================================
+       4. Textarea Auto-expand & Synchronized Font Resizing
+       ========================================================================= */
+    function autoResizeTextarea(el) {
+      if (!el) return;
+      el.style.height = 'auto';
+      el.style.height = el.scrollHeight + 'px';
+    }
+
+    function autoResizeAllTextareas() {
+      document.querySelectorAll('textarea.auto-expand').forEach(ta => {
+        autoResizeTextarea(ta);
+      });
+    }
+
+    const fontSizeSlider = document.getElementById('fontSizeSlider');
+    const fontSizeDisplay = document.getElementById('fontSizeDisplay');
+
+    function updateSynchronizedFontSize(sizePx) {
+      document.documentElement.style.setProperty('--sync-font-size', `${sizePx}px`);
+      const lh = sizePx > 32 ? '1.35' : '1.5';
+      document.documentElement.style.setProperty('--sync-line-height', lh);
+      fontSizeDisplay.textContent = `${sizePx} px`;
+
+      setTimeout(autoResizeAllTextareas, 10);
+    }
+
+    fontSizeSlider.addEventListener('input', (e) => {
+      updateSynchronizedFontSize(e.target.value);
+    });
+
+    document.querySelectorAll('textarea.auto-expand').forEach(ta => {
+      ta.addEventListener('input', () => {
+        autoResizeTextarea(ta);
+      });
+    });
+
+    /* =========================================================================
+       5. UI Helper Functions
+       ========================================================================= */
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      toast.classList.remove('opacity-0', 'translate-y-[-20px]', 'pointer-events-none');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-[-20px]', 'pointer-events-none');
+      }, 3200);
+    }
+
+    function clearTopic(side) {
+      if (side === 'left') {
+        document.getElementById('leftTopicTitle').value = '';
+        document.getElementById('leftProText').value = '';
+        document.getElementById('leftConText').value = '';
+        showToast('已清空左邊題目');
+      } else {
+        document.getElementById('rightTopicTitle').value = '';
+        document.getElementById('rightProText').value = '';
+        document.getElementById('rightConText').value = '';
+        showToast('已清空右邊題目');
+      }
+      autoResizeAllTextareas();
+      if (window.syncStateToCloud) window.syncStateToCloud();
+    }
+
+    /* =========================================================================
+       6. Countdown Timer Engine
+       ========================================================================= */
+    let totalTimerSeconds = 60;
+    let currentSecondsLeft = 60;
+    let timerInterval = null;
+    let isTimerRunning = false;
+
+    function setPresetTimer(sec) {
+      document.getElementById('customTimerInput').value = sec;
+      totalTimerSeconds = sec;
+      resetTimer();
+      showToast(`已設定倒數時間為 ${sec} 秒`);
+    }
+
+    document.getElementById('customTimerInput').addEventListener('change', (e) => {
+      let val = parseInt(e.target.value) || 60;
+      if (val < 5) val = 5;
+      if (val > 3600) val = 3600;
+      e.target.value = val;
+      totalTimerSeconds = val;
+      resetTimer();
+    });
+
+    function updateTimerDisplay() {
+      const display = document.getElementById('timerDisplay');
+      const progressBar = document.getElementById('timerProgressBar');
+      
+      const m = Math.floor(currentSecondsLeft / 60);
+      const s = currentSecondsLeft % 60;
+      display.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+
+      const pct = Math.max(0, Math.min(100, (currentSecondsLeft / totalTimerSeconds) * 100));
+      progressBar.style.width = `${pct}%`;
+
+      if (currentSecondsLeft <= 10 && currentSecondsLeft > 0) {
+        display.classList.remove('text-slate-100');
+        display.classList.add('text-rose-500', 'animate-pulse-fast');
+        progressBar.classList.remove('bg-blue-500');
+        progressBar.classList.add('bg-rose-500');
+      } else {
+        display.classList.remove('text-rose-500', 'animate-pulse-fast');
+        display.classList.add('text-slate-100');
+        progressBar.classList.remove('bg-rose-500');
+        progressBar.classList.add('bg-blue-500');
+      }
+    }
+
+    function startTimer() {
+      initAudio();
+      clearInterval(timerInterval);
+      isTimerRunning = true;
+      
+      const pauseIcon = document.getElementById('pauseIcon');
+      const pauseText = document.getElementById('pauseText');
+      const timerStatusTag = document.getElementById('timerStatusTag');
+      
+      pauseIcon.textContent = '⏸️';
+      pauseText.textContent = '暫停';
+      timerStatusTag.textContent = '倒數中';
+      timerStatusTag.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+
+      playBeepSound('start');
+
+      timerInterval = setInterval(() => {
+        currentSecondsLeft--;
+        updateTimerDisplay();
+
+        if (currentSecondsLeft <= 0) {
+          clearInterval(timerInterval);
+          isTimerRunning = false;
+          
+          timerStatusTag.textContent = '時間到！';
+          timerStatusTag.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 animate-pulse';
+          
+          playBeepSound('alarm');
+        }
+      }, 1000);
+    }
+
+    function toggleTimer() {
+      const pauseIcon = document.getElementById('pauseIcon');
+      const pauseText = document.getElementById('pauseText');
+      const timerStatusTag = document.getElementById('timerStatusTag');
+
+      if (isTimerRunning) {
+        clearInterval(timerInterval);
+        isTimerRunning = false;
+        pauseIcon.textContent = '▶️';
+        pauseText.textContent = '繼續';
+        timerStatusTag.textContent = '已暫停';
+        timerStatusTag.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30';
+      } else {
+        if (currentSecondsLeft > 0) {
+          startTimer();
+        } else {
+          resetTimer();
+          startTimer();
+        }
+      }
+    }
+
+    function resetTimer() {
+      clearInterval(timerInterval);
+      isTimerRunning = false;
+      
+      const customVal = parseInt(document.getElementById('customTimerInput').value) || 60;
+      totalTimerSeconds = customVal;
+      currentSecondsLeft = totalTimerSeconds;
+      
+      document.getElementById('pauseIcon').textContent = '⏸️';
+      document.getElementById('pauseText').textContent = '暫停';
+      const timerStatusTag = document.getElementById('timerStatusTag');
+      timerStatusTag.textContent = '就緒';
+      timerStatusTag.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400';
+
+      updateTimerDisplay();
+    }
+
+    function addTime(sec) {
+      currentSecondsLeft += sec;
+      totalTimerSeconds += sec;
+      updateTimerDisplay();
+      showToast(`已增加 ${sec} 秒`);
+    }
+
+    /* =========================================================================
+       7. Random Draw & Result Rendering Logic
+       ========================================================================= */
+    function drawAndStart() {
+      const min = parseInt(document.getElementById('minNum').value) || 1;
+      const max = parseInt(document.getElementById('maxNum').value) || 30;
+
+      // 計算尚未抽過的號碼列表
+      const available = [];
+      for (let i = min; i <= max; i++) {
+        if (!drawnNumbersSet.has(i)) {
+          available.push(i);
+        }
+      }
+
+      if (available.length === 0) {
+        showToast('⚠️ 所有號碼均已抽過！請先點擊「重置號碼」按鈕。');
+        playBeepSound('alarm');
+        return;
+      }
+
+      // 隨機選取號碼
+      const pickedNum = available[Math.floor(Math.random() * available.length)];
+      drawnNumbersSet.add(pickedNum);
+      updateDrawnHistoryUI();
+
+      // 隨機決定左題(0)或右題(1)
+      const isLeft = Math.random() < 0.5;
+      // 隨機決定正方(true)或反方(false)
+      const isPro = Math.random() < 0.5;
+
+      const sidePrefix = isLeft ? 'left' : 'right';
+      const topicTitle = document.getElementById(`${sidePrefix}TopicTitle`).value.trim() || (isLeft ? '左題' : '右題');
+      const argText = document.getElementById(isPro ? `${sidePrefix}ProText` : `${sidePrefix}ConText`).value.trim() || '未填寫論點內容';
+
+      // 取得結果展示元件
+      const resContainer = document.getElementById('resultContainer');
+      const resNumBadge = document.getElementById('resBadgeNumber');
+      const resSideTag = document.getElementById('resSideTag');
+      const resStanceBadge = document.getElementById('resStanceBadge');
+      const resTopicTitle = document.getElementById('resTopicTitle');
+      const resArgContent = document.getElementById('resArgumentContent');
+
+      // 更新內容與樣式
+      resNumBadge.textContent = `#${pickedNum}`;
+      
+      if (isLeft) {
+        resSideTag.textContent = '【左題】題目 A';
+        resSideTag.className = 'px-3 py-1 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold text-xs';
+      } else {
+        resSideTag.textContent = '【右題】題目 B';
+        resSideTag.className = 'px-3 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold text-xs';
+      }
+
+      if (isPro) {
+        resStanceBadge.textContent = '正方論點 (Pro)';
+        resStanceBadge.className = 'px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold text-xs';
+        resContainer.className = 'lg:col-span-7 bg-slate-900 border-2 border-emerald-500/60 rounded-2xl p-6 shadow-2xl flex flex-col justify-between transition-all duration-300 glow-pro';
+      } else {
+        resStanceBadge.textContent = '反方論點 (Con)';
+        resStanceBadge.className = 'px-3 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold text-xs';
+        resContainer.className = 'lg:col-span-7 bg-slate-900 border-2 border-rose-500/60 rounded-2xl p-6 shadow-2xl flex flex-col justify-between transition-all duration-300 glow-con';
+      }
+
+      resTopicTitle.textContent = topicTitle;
+      resArgContent.textContent = argText;
+
+      playBeepSound('draw');
+      showToast(`抽中號碼 #${pickedNum}（${isLeft ? '左題' : '右題'} - ${isPro ? '正方' : '反方'}）`);
+
+      // 重置並自動開啟計時器
+      resetTimer();
+      startTimer();
+    }
+
+    function copyResultText() {
+      const num = document.getElementById('resBadgeNumber').textContent;
+      const side = document.getElementById('resSideTag').textContent;
+      const stance = document.getElementById('resStanceBadge').textContent;
+      const title = document.getElementById('resTopicTitle').textContent;
+      const content = document.getElementById('resArgumentContent').textContent;
+
+      if (num === '尚未抽選') {
+        showToast('尚無抽籤結果可供複製');
+        return;
+      }
+
+      const textToCopy = `【辯論抽題結果 ${num}】\n題目：${title}\n立場：${side} | ${stance}\n論點內容：\n${content}`;
+
+      const tempTextArea = document.createElement('textarea');
+      tempTextArea.value = textToCopy;
+      document.body.appendChild(tempTextArea);
+      tempTextArea.select();
+      try {
+        document.execCommand('copy');
+        showToast('已成功複製抽籤結果至剪貼簿！');
+      } catch (err) {
+        showToast('複製失敗，請手動複製');
+      }
+      document.body.removeChild(tempTextArea);
+    }
+
+    /* =========================================================================
+       8. Import & Export Engine (JSON & HTML Standalone)
+       ========================================================================= */
+    function exportStateJSON() {
+      const stateData = {
+        version: "1.0",
+        exportedAt: new Date().toISOString(),
+        drawnNumbers: Array.from(drawnNumbersSet),
+        minNum: parseInt(document.getElementById('minNum').value) || 1,
+        maxNum: parseInt(document.getElementById('maxNum').value) || 30,
+        fontSize: parseInt(document.getElementById('fontSizeSlider').value) || 22,
+        timerSeconds: totalTimerSeconds,
+        leftTopic: document.getElementById('leftTopicTitle').value,
+        leftPro: document.getElementById('leftProText').value,
+        leftCon: document.getElementById('leftConText').value,
+        rightTopic: document.getElementById('rightTopicTitle').value,
+        rightPro: document.getElementById('rightProText').value,
+        rightCon: document.getElementById('rightConText').value,
+        resultState: {
+          number: document.getElementById('resBadgeNumber').textContent,
+          sideTag: document.getElementById('resSideTag').textContent,
+          sideTagClass: document.getElementById('resSideTag').className,
+          stanceBadge: document.getElementById('resStanceBadge').textContent,
+          stanceBadgeClass: document.getElementById('resStanceBadge').className,
+          containerClass: document.getElementById('resultContainer').className,
+          title: document.getElementById('resTopicTitle').textContent,
+          content: document.getElementById('resArgumentContent').textContent
+        }
+      };
+
+      const jsonString = JSON.stringify(stateData, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const timeStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      a.href = url;
+      a.download = `debate_state_${timeStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast('已成功下載狀態備份檔 (.json)');
+    }
+
+    function triggerImportState() {
+      document.getElementById('importFileInput').click();
+    }
+
+    function handleImportFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          
+          if (data.drawnNumbers) {
+            drawnNumbersSet = new Set(data.drawnNumbers);
+          }
+          if (data.minNum) document.getElementById('minNum').value = data.minNum;
+          if (data.maxNum) document.getElementById('maxNum').value = data.maxNum;
+
+          if (data.fontSize) {
+            document.getElementById('fontSizeSlider').value = data.fontSize;
+            updateSynchronizedFontSize(data.fontSize);
+          }
+
+          if (data.timerSeconds) {
+            document.getElementById('customTimerInput').value = data.timerSeconds;
+            totalTimerSeconds = data.timerSeconds;
+            resetTimer();
+          }
+
+          if (data.leftTopic !== undefined) document.getElementById('leftTopicTitle').value = data.leftTopic;
+          if (data.leftPro !== undefined) document.getElementById('leftProText').value = data.leftPro;
+          if (data.leftCon !== undefined) document.getElementById('leftConText').value = data.leftCon;
+
+          if (data.rightTopic !== undefined) document.getElementById('rightTopicTitle').value = data.rightTopic;
+          if (data.rightPro !== undefined) document.getElementById('rightProText').value = data.rightPro;
+          if (data.rightCon !== undefined) document.getElementById('rightConText').value = data.rightCon;
+
+          if (data.resultState) {
+            const res = data.resultState;
+            if (res.number) document.getElementById('resBadgeNumber').textContent = res.number;
+            if (res.sideTag) document.getElementById('resSideTag').textContent = res.sideTag;
+            if (res.sideTagClass) document.getElementById('resSideTag').className = res.sideTagClass;
+            if (res.stanceBadge) document.getElementById('resStanceBadge').textContent = res.stanceBadge;
+            if (res.stanceBadgeClass) document.getElementById('resStanceBadge').className = res.stanceBadgeClass;
+            if (res.containerClass) document.getElementById('resultContainer').className = res.containerClass;
+            if (res.title) document.getElementById('resTopicTitle').textContent = res.title;
+            if (res.content) document.getElementById('resArgumentContent').textContent = res.content;
+          }
+
+          updateDrawnHistoryUI(true);
+          autoResizeAllTextareas();
+          showToast('已成功匯入並還原狀態！');
+
+        } catch (err) {
+          console.error('Import error:', err);
+          showToast('檔案格式錯誤，無法解析 JSON！');
+        } finally {
+          event.target.value = '';
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    window.onload = function() {
+      if (window.__INITIAL_EMBEDDED_STATE__) {
+        const st = window.__INITIAL_EMBEDDED_STATE__;
+        if (st.drawnNumbers) drawnNumbersSet = new Set(st.drawnNumbers);
+        if (st.fontSize) {
+          document.getElementById('fontSizeSlider').value = st.fontSize;
+          updateSynchronizedFontSize(st.fontSize);
+        }
+        if (st.timerSeconds) {
+          document.getElementById('customTimerInput').value = st.timerSeconds;
+          totalTimerSeconds = st.timerSeconds;
+        }
+      }
+
+      updateSynchronizedFontSize(fontSizeSlider.value);
+      autoResizeAllTextareas();
+      updateTimerDisplay();
+      updateDrawnHistoryUI(false);
+    };
+  </script>
+</body>
+</html>
